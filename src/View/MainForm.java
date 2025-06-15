@@ -8,21 +8,22 @@ public class MainForm extends JFrame {
     private String role;
     private int userId;
 
-    public MainForm(String role, int id) {
+    public MainForm(String role, int userId) {
         this.role = role;
-        this.userId = id;
+        this.userId = userId;
 
         setTitle("Dashboard - " + role);
         setSize(600, 400);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
 
-        if ("rt_rw".equals(role)) {
-            add(new AdminPanel());
-        } else if ("petugas".equals(role)) {
-            add(new PetugasPanel());
+        if ("admin".equalsIgnoreCase(role)) {
+            add(new AdminPanel1(), BorderLayout.CENTER);
+        } else if ("petugas".equalsIgnoreCase(role)) {
+            add(new PetugasPanel1(userId), BorderLayout.CENTER);
         } else {
-            add(new WargaPanel(userId));
+            add(new WargaPanel1(userId), BorderLayout.CENTER);
         }
 
         setVisible(true);
