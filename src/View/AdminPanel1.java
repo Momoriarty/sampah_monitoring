@@ -33,8 +33,7 @@ public class AdminPanel1 extends JPanel {
         btnAdd.addActionListener(e -> {
             String nama = JOptionPane.showInputDialog(this, "Nama RW:");
             if (nama != null && !nama.trim().isEmpty()) {
-                try (Connection c = DBConnection.getConnection();
-                     PreparedStatement ps = c.prepareStatement("INSERT INTO rw (nama_rw) VALUES (?)")) {
+                try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement("INSERT INTO rw (nama_rw) VALUES (?)")) {
                     ps.setString(1, nama);
                     ps.executeUpdate();
                     refreshRW();
@@ -53,9 +52,7 @@ public class AdminPanel1 extends JPanel {
         if (cbRW != null) {
             cbRW.removeAllItems();
         }
-        try (Connection c = DBConnection.getConnection();
-             Statement s = c.createStatement();
-             ResultSet rs = s.executeQuery("SELECT * FROM rw")) {
+        try (Connection c = DBConnection.getConnection(); Statement s = c.createStatement(); ResultSet rs = s.executeQuery("SELECT * FROM rw")) {
             while (rs.next()) {
                 modelRW.addRow(new Object[]{rs.getInt("id_rw"), rs.getString("nama_rw")});
                 if (cbRW != null) {
@@ -69,7 +66,7 @@ public class AdminPanel1 extends JPanel {
 
     private JPanel panelRT() {
         JPanel p = new JPanel(new BorderLayout());
-        modelRT = new DefaultTableModel(new String[]{"ID RT", "ID RW", "Nama RT"}, 0);
+        modelRT = new DefaultTableModel(new String[]{"ID RT", "ID RW", "Nomor RT", "Nama RT"}, 0);
         JTable tbl = new JTable(modelRT);
         refreshRT();
         JButton btnAdd = new JButton("Tambah RT");
@@ -80,44 +77,48 @@ public class AdminPanel1 extends JPanel {
     }
 
     private void showAddRT() {
-        JPanel panel = new JPanel(new GridLayout(2, 2));
+        JPanel panel = new JPanel(new GridLayout(3, 2));
         cbRW = new JComboBox<>();
         refreshRW();
-        JTextField namaRT = new JTextField();
+        JTextField tfNomorRT = new JTextField();
+        JTextField tfNamaRT = new JTextField();
 
         panel.add(new JLabel("Pilih RW:"));
         panel.add(cbRW);
+        panel.add(new JLabel("Nomor RT:"));
+        panel.add(tfNomorRT);
         panel.add(new JLabel("Nama RT:"));
-        panel.add(namaRT);
+        panel.add(tfNamaRT);
 
         if (JOptionPane.showConfirmDialog(this, panel, "Tambah RT", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
             try {
                 String selected = (String) cbRW.getSelectedItem();
                 int idRW = Integer.parseInt(selected.split(" - ")[0]);
-                String nama = namaRT.getText().trim();
+                int nomorRT = Integer.parseInt(tfNomorRT.getText().trim());
+                String nama = tfNamaRT.getText().trim();
                 if (!nama.isEmpty()) {
-                    try (Connection c = DBConnection.getConnection();
-                         PreparedStatement ps = c.prepareStatement("INSERT INTO rt (id_rw, nama_rt) VALUES (?, ?)")) {
+                    try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement("INSERT INTO rt (id_rw, nomor_rt, nama_rt) VALUES (?, ?, ?)")) {
                         ps.setInt(1, idRW);
-                        ps.setString(2, nama);
+                        ps.setInt(2, nomorRT);
+                        ps.setString(3, nama);
                         ps.executeUpdate();
                         refreshRT();
                     }
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Input tidak valid.");
             }
         }
     }
 
     private void refreshRT() {
         modelRT.setRowCount(0);
-        try (Connection c = DBConnection.getConnection();
-             Statement s = c.createStatement();
-             ResultSet rs = s.executeQuery("SELECT * FROM rt")) {
+        try (Connection c = DBConnection.getConnection(); Statement s = c.createStatement(); ResultSet rs = s.executeQuery("SELECT * FROM rt")) {
             while (rs.next()) {
                 modelRT.addRow(new Object[]{
-                        rs.getInt("id_rt"), rs.getInt("id_rw"), rs.getString("nama_rt")
+                    rs.getInt("id_rt"), rs.getInt("id_rw"),
+                    rs.getInt("nomor_rt"), rs.getString("nama_rt")
                 });
             }
         } catch (SQLException ex) {
@@ -139,14 +140,12 @@ public class AdminPanel1 extends JPanel {
 
     private void refreshWarga() {
         modelWarga.setRowCount(0);
-        try (Connection c = DBConnection.getConnection();
-             Statement s = c.createStatement();
-             ResultSet rs = s.executeQuery("SELECT * FROM warga")) {
+        try (Connection c = DBConnection.getConnection(); Statement s = c.createStatement(); ResultSet rs = s.executeQuery("SELECT * FROM warga")) {
             while (rs.next()) {
                 modelWarga.addRow(new Object[]{
-                        rs.getInt("id_warga"), rs.getString("nama"),
-                        rs.getString("alamat"), rs.getInt("id_rt"),
-                        rs.getInt("id_rw"), rs.getString("no_hp")
+                    rs.getInt("id_warga"), rs.getString("nama"),
+                    rs.getString("alamat"), rs.getInt("id_rt"),
+                    rs.getInt("id_rw"), rs.getString("no_hp")
                 });
             }
         } catch (SQLException ex) {
@@ -171,9 +170,8 @@ public class AdminPanel1 extends JPanel {
         f.add(tph);
 
         if (JOptionPane.showConfirmDialog(this, f, "Tambah Warga", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
-            try (Connection c = DBConnection.getConnection();
-                 PreparedStatement ps = c.prepareStatement(
-                         "INSERT INTO warga (nama, alamat, id_rt, id_rw, no_hp) VALUES (?, ?, ?, ?, ?)")) {
+            try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(
+                    "INSERT INTO warga (nama, alamat, id_rt, id_rw, no_hp) VALUES (?, ?, ?, ?, ?)")) {
                 ps.setString(1, tn.getText());
                 ps.setString(2, ta.getText());
                 ps.setInt(3, Integer.parseInt(trt.getText()));
@@ -186,8 +184,6 @@ public class AdminPanel1 extends JPanel {
             }
         }
     }
-
-    // --- Tambahan: Panel Jadwal Pengangkutan ---
 
     private JPanel panelJadwal() {
         JPanel p = new JPanel(new BorderLayout());
@@ -208,8 +204,7 @@ public class AdminPanel1 extends JPanel {
             int idJadwal = (int) modelJadwal.getValueAt(row, 0);
             int confirm = JOptionPane.showConfirmDialog(this, "Hapus jadwal dengan ID " + idJadwal + "?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
-                try (Connection c = DBConnection.getConnection();
-                     PreparedStatement ps = c.prepareStatement("DELETE FROM jadwal_pengangkutan WHERE id_jadwal=?")) {
+                try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement("DELETE FROM jadwal_pengangkutan WHERE id_jadwal=?")) {
                     ps.setInt(1, idJadwal);
                     ps.executeUpdate();
                     refreshJadwal();
@@ -230,16 +225,14 @@ public class AdminPanel1 extends JPanel {
 
     private void refreshJadwal() {
         modelJadwal.setRowCount(0);
-        try (Connection c = DBConnection.getConnection();
-             Statement s = c.createStatement();
-             ResultSet rs = s.executeQuery("SELECT * FROM jadwal_pengangkutan")) {
+        try (Connection c = DBConnection.getConnection(); Statement s = c.createStatement(); ResultSet rs = s.executeQuery("SELECT * FROM jadwal_pengangkutan")) {
             while (rs.next()) {
                 modelJadwal.addRow(new Object[]{
-                        rs.getInt("id_jadwal"),
-                        rs.getDate("tanggal"),
-                        rs.getString("jam"),
-                        rs.getInt("id_rt"),
-                        rs.getInt("id_rw")
+                    rs.getInt("id_jadwal"),
+                    rs.getDate("tanggal"),
+                    rs.getString("jam"),
+                    rs.getInt("id_rt"),
+                    rs.getInt("id_rw")
                 });
             }
         } catch (SQLException ex) {
@@ -250,33 +243,40 @@ public class AdminPanel1 extends JPanel {
     private void showAddJadwal() {
         JPanel panel = new JPanel(new GridLayout(4, 2));
 
-        JTextField tfTanggal = new JTextField("YYYY-MM-DD");
-        JTextField tfJam = new JTextField("HH:mm");
+        // Spinner untuk tanggal
+        SpinnerDateModel dateModel = new SpinnerDateModel();
+        JSpinner spTanggal = new JSpinner(dateModel);
+        spTanggal.setEditor(new JSpinner.DateEditor(spTanggal, "yyyy-MM-dd"));
+
+        // Spinner untuk jam
+        SpinnerDateModel timeModel = new SpinnerDateModel();
+        JSpinner spJam = new JSpinner(timeModel);
+        spJam.setEditor(new JSpinner.DateEditor(spJam, "HH:mm"));
+
         cbRW = new JComboBox<>();
         cbRT = new JComboBox<>();
 
         refreshRW();
-        panel.add(new JLabel("Tanggal (YYYY-MM-DD):"));
-        panel.add(tfTanggal);
+        panel.add(new JLabel("Tanggal (yyyy-MM-dd):"));
+        panel.add(spTanggal);
         panel.add(new JLabel("Jam (HH:mm):"));
-        panel.add(tfJam);
+        panel.add(spJam);
         panel.add(new JLabel("Pilih RW:"));
         panel.add(cbRW);
         panel.add(new JLabel("Pilih RT:"));
         panel.add(cbRT);
 
-        // update cbRT saat cbRW berubah
+        // Update RT ketika RW berubah
         cbRW.addActionListener(e -> {
             cbRT.removeAllItems();
             if (cbRW.getSelectedItem() != null) {
                 try {
                     int idRW = Integer.parseInt(cbRW.getSelectedItem().toString().split(" - ")[0]);
-                    try (Connection c = DBConnection.getConnection();
-                         PreparedStatement ps = c.prepareStatement("SELECT id_rt, nama_rt FROM rt WHERE id_rw=?")) {
+                    try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT id_rt, nomor_rt FROM rt WHERE id_rw=?")) {
                         ps.setInt(1, idRW);
                         ResultSet rs = ps.executeQuery();
                         while (rs.next()) {
-                            cbRT.addItem(rs.getInt("id_rt") + " - " + rs.getString("nama_rt"));
+                            cbRT.addItem(rs.getInt("id_rt") + " - RT " + rs.getInt("nomor_rt"));
                         }
                     }
                 } catch (SQLException ex) {
@@ -288,16 +288,21 @@ public class AdminPanel1 extends JPanel {
         int result = JOptionPane.showConfirmDialog(this, panel, "Tambah Jadwal Pengangkutan", JOptionPane.OK_CANCEL_OPTION);
         if (result == JOptionPane.OK_OPTION) {
             try {
-                String tanggal = tfTanggal.getText().trim();
-                String jam = tfJam.getText().trim();
+                // Ambil nilai dari spinner
+                java.util.Date tanggal = (java.util.Date) spTanggal.getValue();
+                java.util.Date jam = (java.util.Date) spJam.getValue();
+
+                // Konversi ke format SQL
+                java.sql.Date sqlTanggal = new java.sql.Date(tanggal.getTime());
+                java.sql.Time sqlJam = new java.sql.Time(jam.getTime());
+
                 int idRT = Integer.parseInt(cbRT.getSelectedItem().toString().split(" - ")[0]);
                 int idRW = Integer.parseInt(cbRW.getSelectedItem().toString().split(" - ")[0]);
 
-                try (Connection c = DBConnection.getConnection();
-                     PreparedStatement ps = c.prepareStatement(
-                             "INSERT INTO jadwal_pengangkutan (tanggal, jam, id_rt, id_rw) VALUES (?, ?, ?, ?)")) {
-                    ps.setDate(1, Date.valueOf(tanggal));
-                    ps.setString(2, jam);
+                try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(
+                        "INSERT INTO jadwal_pengangkutan (tanggal, jam, id_rt, id_rw) VALUES (?, ?, ?, ?)")) {
+                    ps.setDate(1, sqlTanggal);
+                    ps.setTime(2, sqlJam);
                     ps.setInt(3, idRT);
                     ps.setInt(4, idRW);
                     ps.executeUpdate();
@@ -309,4 +314,5 @@ public class AdminPanel1 extends JPanel {
             }
         }
     }
+
 }
