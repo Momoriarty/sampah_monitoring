@@ -240,6 +240,7 @@ public class AdminPanel1 extends JPanel {
         }
     }
 
+    // (kode lainnya tetap sama, hanya bagian showAddJadwal yang berubah)
     private void showAddJadwal() {
         JPanel panel = new JPanel(new GridLayout(4, 2));
 
@@ -261,7 +262,7 @@ public class AdminPanel1 extends JPanel {
         panel.add(spTanggal);
         panel.add(new JLabel("Jam (HH:mm):"));
         panel.add(spJam);
-        panel.add(new JLabel("Pilih RW:"));
+        panel.add(new JLabel("Pilih RW :"));
         panel.add(cbRW);
         panel.add(new JLabel("Pilih RT:"));
         panel.add(cbRT);
@@ -272,11 +273,14 @@ public class AdminPanel1 extends JPanel {
             if (cbRW.getSelectedItem() != null) {
                 try {
                     int idRW = Integer.parseInt(cbRW.getSelectedItem().toString().split(" - ")[0]);
-                    try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT id_rt, nomor_rt FROM rt WHERE id_rw=?")) {
+                    try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT id_rt, nomor_rt, nama_rt FROM rt WHERE id_rw=?")) {
                         ps.setInt(1, idRW);
                         ResultSet rs = ps.executeQuery();
                         while (rs.next()) {
-                            cbRT.addItem(rs.getInt("id_rt") + " - RT " + rs.getInt("nomor_rt"));
+                            int idRT = rs.getInt("id_rt");
+                            int nomorRT = rs.getInt("nomor_rt");
+                            String namaRT = rs.getString("nama_rt");
+                            cbRT.addItem(idRT + " - RT " + nomorRT + " - " + namaRT);
                         }
                     }
                 } catch (SQLException ex) {
@@ -288,6 +292,12 @@ public class AdminPanel1 extends JPanel {
         int result = JOptionPane.showConfirmDialog(this, panel, "Tambah Jadwal Pengangkutan", JOptionPane.OK_CANCEL_OPTION);
         if (result == JOptionPane.OK_OPTION) {
             try {
+                // Validasi pilihan RT dan RW
+                if (cbRW.getSelectedItem() == null || cbRT.getSelectedItem() == null) {
+                    JOptionPane.showMessageDialog(this, "RT dan RW harus dipilih terlebih dahulu.");
+                    return;
+                }
+
                 // Ambil nilai dari spinner
                 java.util.Date tanggal = (java.util.Date) spTanggal.getValue();
                 java.util.Date jam = (java.util.Date) spJam.getValue();
