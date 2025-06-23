@@ -20,13 +20,13 @@ public class LoginForm extends JFrame {
         setSize(400, 250);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setResizable(false);
-        setLocationRelativeTo(null); // Center window
+        setLocationRelativeTo(null); 
 
         // Panel Utama
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 10, 10, 10); // Padding antar komponen
+        gbc.insets = new Insets(10, 10, 10, 10);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
         JLabel lblTitle = new JLabel("Login Aplikasi Sampah", JLabel.CENTER);

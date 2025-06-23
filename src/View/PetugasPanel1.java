@@ -25,27 +25,31 @@ public class PetugasPanel1 extends JPanel {
 
         JTabbedPane tabs = new JTabbedPane();
 
-        // Panel Jadwal
+        // ================= PANEL JADWAL =================
         JPanel jadwalPanel = new JPanel(new BorderLayout());
         jadwalModel = new DefaultTableModel(new String[]{"ID Jadwal", "Tanggal", "Jam", "RT", "RW", "Status"}, 0);
         jadwalTable = new JTable(jadwalModel);
         refreshJadwalTable();
+
         JButton btnUpdate = new JButton("Update Status");
         btnUpdate.addActionListener(e -> updateStatus(jadwalTable));
+
         jadwalPanel.add(new JScrollPane(jadwalTable), BorderLayout.CENTER);
         jadwalPanel.add(btnUpdate, BorderLayout.SOUTH);
+
         tabs.add("Jadwal Pengangkutan", jadwalPanel);
 
-        // Panel Laporan
+        // ================= PANEL LAPORAN =================
         JPanel laporanPanel = new JPanel(new BorderLayout());
         JPanel filterPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        // Filter Tanggal
         gbc.gridx = 0;
         gbc.gridy = 0;
-
         filterPanel.add(new JLabel("Tanggal Mulai (YYYY-MM-DD):"), gbc);
         gbc.gridx = 1;
         txtTanggalMulai = new JTextField(10);
@@ -57,6 +61,7 @@ public class PetugasPanel1 extends JPanel {
         txtTanggalAkhir = new JTextField(10);
         filterPanel.add(txtTanggalAkhir, gbc);
 
+        // Filter RT dan RW
         gbc.gridx = 0;
         gbc.gridy = 1;
         filterPanel.add(new JLabel("RT:"), gbc);
@@ -74,20 +79,23 @@ public class PetugasPanel1 extends JPanel {
         loadRTRW(cbRW, "rw");
         filterPanel.add(cbRW, gbc);
 
+        // Tombol Filter
         gbc.gridx = 4;
-        gbc.gridy = 1;
         JButton btnFilter = new JButton("Filter");
         btnFilter.addActionListener(e -> refreshLaporanTable());
         filterPanel.add(btnFilter, gbc);
 
         laporanPanel.add(filterPanel, BorderLayout.NORTH);
 
-        laporanModel = new DefaultTableModel(new String[]{"Nama Warga", "Tanggal", "Organik (kg)", "Anorganik (kg)", "Catatan"}, 0);
+        laporanModel = new DefaultTableModel(
+                new String[]{"Nama Warga", "Tanggal", "Organik (kg)", "Anorganik (kg)", "Catatan"}, 0);
         laporanTable = new JTable(laporanModel);
         laporanPanel.add(new JScrollPane(laporanTable), BorderLayout.CENTER);
 
         tabs.add("Laporan Sampah Warga", laporanPanel);
+
         add(tabs, BorderLayout.CENTER);
+        System.out.println("Tabs added: " + tabs.getTabCount());
     }
 
     private void refreshJadwalTable() {
@@ -133,12 +141,9 @@ public class PetugasPanel1 extends JPanel {
                     cek.setInt(1, idJ);
                     cek.setInt(2, userId);
                     ResultSet rs = cek.executeQuery();
-                    if (rs.next()) {
-                        String statusLama = rs.getString("status");
-                        if (statusBaru.equals(statusLama)) {
-                            JOptionPane.showMessageDialog(this, "Status sudah '" + statusBaru + "'. Tidak ada perubahan.");
-                            return;
-                        }
+                    if (rs.next() && statusBaru.equals(rs.getString("status"))) {
+                        JOptionPane.showMessageDialog(this, "Status sudah '" + statusBaru + "'. Tidak ada perubahan.");
+                        return;
                     }
                 }
 
@@ -151,9 +156,34 @@ public class PetugasPanel1 extends JPanel {
                     ps.setInt(2, userId);
                     ps.setString(3, statusBaru);
                     ps.executeUpdate();
-                    refreshJadwalTable();
-                    JOptionPane.showMessageDialog(this, "Status berhasil diperbarui menjadi '" + statusBaru + "'.");
                 }
+
+                if ("sudah".equals(statusBaru)) {
+                    String sqlJadwal = "SELECT id_rt, id_rw, tanggal FROM jadwal_pengangkutan WHERE id_jadwal = ?";
+                    try (PreparedStatement psJ = c.prepareStatement(sqlJadwal)) {
+                        psJ.setInt(1, idJ);
+                        ResultSet rs = psJ.executeQuery();
+                        if (rs.next()) {
+                            int idRt = rs.getInt("id_rt");
+                            int idRw = rs.getInt("id_rw");
+                            Date tgl = rs.getDate("tanggal");
+
+                            String updateLaporan = "UPDATE laporan_sampah SET status = 'Selesai' "
+                                    + "WHERE tanggal_lapor <= ? "
+                                    + "AND id_warga IN (SELECT id_warga FROM warga WHERE id_rt = ? AND id_rw = ?)";
+
+                            try (PreparedStatement psU = c.prepareStatement(updateLaporan)) {
+                                psU.setDate(1, tgl);
+                                psU.setInt(2, idRt);
+                                psU.setInt(3, idRw);
+                                psU.executeUpdate();
+                            }
+                        }
+                    }
+                }
+
+                refreshJadwalTable();
+                JOptionPane.showMessageDialog(this, "Status berhasil diperbarui menjadi '" + statusBaru + "'.");
 
             } catch (SQLException ex) {
                 ex.printStackTrace();
@@ -169,19 +199,19 @@ public class PetugasPanel1 extends JPanel {
         String selectedRT = (String) cbRT.getSelectedItem();
         String selectedRW = (String) cbRW.getSelectedItem();
 
-        StringBuilder sql = new StringBuilder("SELECT l.nama_warga, l.tanggal, l.organik, l.anorganik, l.catatan "
-                + "FROM laporan_sampah l WHERE 1=1 ");
+        StringBuilder sql = new StringBuilder("SELECT w.nama, l.tanggal_lapor, l.berat_organik, l.berat_anorganik, l.catatan "
+                + "FROM laporan_sampah l INNER JOIN warga w ON l.id_warga = w.id_warga ");
 
         if (!tanggalMulai.isEmpty()) {
-            sql.append(" AND l.tanggal >= STR_TO_DATE(?, '%Y-%m-%d') ");
+            sql.append(" AND l.tanggal_lapor >= STR_TO_DATE(?, '%Y-%m-%d') ");
         }
         if (!tanggalAkhir.isEmpty()) {
-            sql.append(" AND l.tanggal <= STR_TO_DATE(?, '%Y-%m-%d') ");
+            sql.append(" AND l.tanggal_lapor <= STR_TO_DATE(?, '%Y-%m-%d') ");
         }
-        if (selectedRT != null && !selectedRT.equals("Semua")) {
+        if (!"Semua".equals(selectedRT)) {
             sql.append(" AND l.id_rt = ? ");
         }
-        if (selectedRW != null && !selectedRW.equals("Semua")) {
+        if (!"Semua".equals(selectedRW)) {
             sql.append(" AND l.id_rw = ? ");
         }
 
@@ -194,20 +224,20 @@ public class PetugasPanel1 extends JPanel {
             if (!tanggalAkhir.isEmpty()) {
                 ps.setString(idx++, tanggalAkhir);
             }
-            if (selectedRT != null && !selectedRT.equals("Semua")) {
+            if (!"Semua".equals(selectedRT)) {
                 ps.setInt(idx++, Integer.parseInt(selectedRT));
             }
-            if (selectedRW != null && !selectedRW.equals("Semua")) {
+            if (!"Semua".equals(selectedRW)) {
                 ps.setInt(idx++, Integer.parseInt(selectedRW));
             }
 
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 laporanModel.addRow(new Object[]{
-                    rs.getString("nama_warga"),
-                    rs.getDate("tanggal"),
-                    rs.getDouble("organik"),
-                    rs.getDouble("anorganik"),
+                    rs.getString("nama"),
+                    rs.getDate("tanggal_lapor"),
+                    rs.getDouble("berat_organik"),
+                    rs.getDouble("berat_anorganik"),
                     rs.getString("catatan")
                 });
             }

@@ -47,7 +47,7 @@ public class WargaPanel1 extends JPanel {
 
         // Panel Laporan
         laporanPanel = new JPanel(new BorderLayout());
-        model = new DefaultTableModel(new String[]{"ID", "Tanggal", "Organik", "Anorganik", "Catatan", "Status"}, 0);
+        model = new DefaultTableModel(new String[]{"No", "Tanggal", "Organik", "Anorganik", "Catatan", "Status"}, 0);
         JTable table = new JTable(model);
         laporanPanel.add(new JScrollPane(table), BorderLayout.CENTER);
 
@@ -81,8 +81,9 @@ public class WargaPanel1 extends JPanel {
             try (PreparedStatement ps = c.prepareStatement(sql)) {
                 ps.setInt(1, userId);
                 ResultSet rs = ps.executeQuery();
+                int no = 1;
                 while (rs.next()) {
-                    int idLaporan = rs.getInt("id_laporan");
+                    int idLaporan = no++;
                     Date tanggal = rs.getDate("tanggal_lapor");
                     float organik = rs.getFloat("berat_organik");
                     float anorganik = rs.getFloat("berat_anorganik");
@@ -124,7 +125,7 @@ public class WargaPanel1 extends JPanel {
     }
 
     private boolean isProfileComplete() {
-        String sql = "SELECT w.nama, w.alamat, w.no_hp, w.no_rumah FROM warga w JOIN user_app u ON w.id_warga = u.id_warga WHERE u.id_user=?";
+        String sql = "SELECT w.nama, w.alamat, w.no_hp, w.no_rumah, w.catatan_rumah FROM warga w JOIN user_app u ON w.id_warga = u.id_warga WHERE u.id_user=?";
         try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, userId);
             ResultSet rs = ps.executeQuery();
@@ -132,7 +133,8 @@ public class WargaPanel1 extends JPanel {
                 return rs.getString("nama") != null && !rs.getString("nama").trim().isEmpty()
                         && rs.getString("alamat") != null && !rs.getString("alamat").trim().isEmpty()
                         && rs.getString("no_hp") != null && !rs.getString("no_hp").trim().isEmpty()
-                        && rs.getString("no_rumah") != null && !rs.getString("no_rumah").trim().isEmpty();
+                        && rs.getString("no_rumah") != null && !rs.getString("no_rumah").trim().isEmpty()
+                        && rs.getString("catatan_rumah") != null && !rs.getString("catatan_rumah").trim().isEmpty();
             }
         } catch (SQLException ex) {
             ex.printStackTrace();
@@ -191,7 +193,8 @@ public class WargaPanel1 extends JPanel {
     }
 
     private void showUpdateProfileDialog() {
-        String getSql = "SELECT w.id_warga, w.nama, w.alamat, w.no_rumah, w.no_hp, w.id_rw, w.id_rt FROM warga w JOIN user_app u ON w.id_warga = u.id_warga WHERE u.id_user=?";
+        String getSql = "SELECT w.id_warga, w.nama, w.alamat, w.no_rumah, w.no_hp, w.id_rw, w.id_rt, w.catatan_rumah "
+                + "FROM warga w JOIN user_app u ON w.id_warga = u.id_warga WHERE u.id_user=?";
         try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(getSql)) {
             ps.setInt(1, userId);
             ResultSet rs = ps.executeQuery();
@@ -202,6 +205,7 @@ public class WargaPanel1 extends JPanel {
                 JTextField tfAlamat = new JTextField(rs.getString("alamat"));
                 JTextField tfNoRumah = new JTextField(rs.getString("no_rumah"));
                 JTextField tfHp = new JTextField(rs.getString("no_hp"));
+                JTextField tfCatatanRumah = new JTextField(rs.getString("catatan_rumah"));
 
                 JComboBox<String> cbRW = new JComboBox<>();
                 JComboBox<String> cbRT = new JComboBox<>();
@@ -247,7 +251,7 @@ public class WargaPanel1 extends JPanel {
                     cbRW.setSelectedIndex(0);
                 }
 
-                JPanel p = new JPanel(new GridLayout(6, 2));
+                JPanel p = new JPanel(new GridLayout(7, 2));
                 p.add(new JLabel("Nama:"));
                 p.add(tfNama);
                 p.add(new JLabel("Alamat:"));
@@ -256,6 +260,8 @@ public class WargaPanel1 extends JPanel {
                 p.add(tfNoRumah);
                 p.add(new JLabel("No HP:"));
                 p.add(tfHp);
+                p.add(new JLabel("Catatan Rumah:"));
+                p.add(tfCatatanRumah);
                 p.add(new JLabel("RW:"));
                 p.add(cbRW);
                 p.add(new JLabel("RT:"));
@@ -263,7 +269,8 @@ public class WargaPanel1 extends JPanel {
 
                 int ok = JOptionPane.showConfirmDialog(this, p, "Perbarui Profil", JOptionPane.OK_CANCEL_OPTION);
                 if (ok == JOptionPane.OK_OPTION) {
-                    if (tfNama.getText().isEmpty() || tfAlamat.getText().isEmpty() || tfNoRumah.getText().isEmpty() || tfHp.getText().isEmpty()) {
+                    if (tfNama.getText().isEmpty() || tfAlamat.getText().isEmpty()
+                            || tfNoRumah.getText().isEmpty() || tfHp.getText().isEmpty()) {
                         JOptionPane.showMessageDialog(this, "Semua field wajib diisi.");
                         return;
                     }
@@ -278,15 +285,16 @@ public class WargaPanel1 extends JPanel {
                     int rwId = Integer.parseInt(rwItem.toString().split(" ")[1]);
                     int rtId = Integer.parseInt(rtItem.toString().split(" ")[1]);
 
-                    String upSql = "UPDATE warga SET nama=?, alamat=?, no_rumah=?, no_hp=?, id_rw=?, id_rt=? WHERE id_warga=?";
+                    String upSql = "UPDATE warga SET nama=?, alamat=?, no_rumah=?, no_hp=?, catatan_rumah=?, id_rw=?, id_rt=? WHERE id_warga=?";
                     try (PreparedStatement up = c.prepareStatement(upSql)) {
                         up.setString(1, tfNama.getText());
                         up.setString(2, tfAlamat.getText());
                         up.setString(3, tfNoRumah.getText());
                         up.setString(4, tfHp.getText());
-                        up.setInt(5, rwId);
-                        up.setInt(6, rtId);
-                        up.setInt(7, idWarga);
+                        up.setString(5, tfCatatanRumah.getText());
+                        up.setInt(6, rwId);
+                        up.setInt(7, rtId);
+                        up.setInt(8, idWarga);
                         up.executeUpdate();
                         JOptionPane.showMessageDialog(this, "Profil berhasil diperbarui.");
                     }
