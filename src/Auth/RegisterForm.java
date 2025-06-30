@@ -16,7 +16,7 @@ public class RegisterForm extends JFrame {
 
     public RegisterForm() {
         setTitle("Register User");
-        setSize(400, 220);
+        setSize(400, 250);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
@@ -36,14 +36,28 @@ public class RegisterForm extends JFrame {
             p.add(comps[i], c);
         }
 
+        // Tombol Register
         c.gridx = 0;
         c.gridy = labels.length;
         c.gridwidth = 2;
         p.add(btnRegister, c);
 
+        // Tombol Kembali
+        JButton btnBack = new JButton("Kembali");
+        btnBack.setBackground(Color.GRAY);
+        btnBack.setForeground(Color.WHITE);
+        btnBack.setFocusPainted(false);
+        c.gridy++;
+        p.add(btnBack, c);
+
         add(p);
 
         btnRegister.addActionListener(e -> registerUser());
+        btnBack.addActionListener(e -> {
+            dispose();
+            new MainAuth();
+        });
+
         setVisible(true);
     }
 
@@ -87,7 +101,7 @@ public class RegisterForm extends JFrame {
             String insertUser = "INSERT INTO user_app (username, password, role, id_warga) VALUES (?, ?, ?, ?)";
             try (PreparedStatement pst = con.prepareStatement(insertUser)) {
                 pst.setString(1, username);
-                pst.setString(2, hashPassword(password)); // Ganti BCrypt -> SHA-256
+                pst.setString(2, hashPassword(password));
                 pst.setString(3, role);
                 if (idWarga != null) {
                     pst.setInt(4, idWarga);

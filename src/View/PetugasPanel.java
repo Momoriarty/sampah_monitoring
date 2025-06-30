@@ -7,7 +7,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.sql.*;
 
-public class PetugasPanel1 extends JPanel {
+public class PetugasPanel extends JPanel {
 
     private DefaultTableModel jadwalModel;
     private DefaultTableModel laporanModel;
@@ -19,7 +19,7 @@ public class PetugasPanel1 extends JPanel {
     private JTextField txtTanggalMulai, txtTanggalAkhir;
     private JComboBox<String> cbRT, cbRW;
 
-    public PetugasPanel1(int userId) {
+    public PetugasPanel(int userId) {
         this.userId = userId;
         setLayout(new BorderLayout());
 

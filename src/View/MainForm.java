@@ -19,11 +19,11 @@ public class MainForm extends JFrame {
         setLayout(new BorderLayout());
 
         if ("admin".equalsIgnoreCase(role)) {
-            add(new AdminPanel1(), BorderLayout.CENTER);
+            add(new AdminPanel(), BorderLayout.CENTER);
         } else if ("petugas".equalsIgnoreCase(role)) {
-            add(new PetugasPanel1(userId), BorderLayout.CENTER);
+            add(new PetugasPanel(userId), BorderLayout.CENTER);
         } else {
-            add(new WargaPanel1(userId), BorderLayout.CENTER);
+            add(new WargaPanel(userId), BorderLayout.CENTER);
         }
 
         setVisible(true);

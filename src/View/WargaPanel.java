@@ -2,19 +2,23 @@ package View;
 
 import Connection.DBConnection;
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File;
 import java.sql.*;
+import java.text.SimpleDateFormat;
 
-public class WargaPanel1 extends JPanel {
+public class WargaPanel extends JPanel {
 
     private int userId;
     private DefaultTableModel model;
+    private DefaultTableModel pembayaranModel;
     private CardLayout cardLayout;
-    private JPanel mainPanel, choicePanel, laporanPanel;
+    private JPanel mainPanel, choicePanel, laporanPanel, pembayaranPanel;
 
-    public WargaPanel1(int userId) {
+    public WargaPanel(int userId) {
         this.userId = userId;
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
@@ -26,15 +30,19 @@ public class WargaPanel1 extends JPanel {
 
         JButton btnProfil = new JButton("Perbarui Profil");
         JButton btnLaporan = new JButton("Tambah Laporan");
+        JButton btnPembayaran = new JButton("Riwayat Pembayaran");
 
         btnProfil.addActionListener(e -> showUpdateProfileDialog());
         btnLaporan.addActionListener(e -> {
             if (isProfileComplete()) {
                 cardLayout.show(mainPanel, "laporan");
                 refreshTable();
-            } else {
-                JOptionPane.showMessageDialog(this, "Lengkapi profil terlebih dahulu.");
             }
+        });
+
+        btnPembayaran.addActionListener(e -> {
+            cardLayout.show(mainPanel, "pembayaran");
+            refreshPaymentTable();
         });
 
         gbc.gridx = 0;
@@ -44,6 +52,8 @@ public class WargaPanel1 extends JPanel {
         choicePanel.add(btnProfil, gbc);
         gbc.gridy++;
         choicePanel.add(btnLaporan, gbc);
+        gbc.gridy++;
+        choicePanel.add(btnPembayaran, gbc);
 
         // Panel Laporan
         laporanPanel = new JPanel(new BorderLayout());
@@ -62,12 +72,200 @@ public class WargaPanel1 extends JPanel {
         bottomPanel.add(btnAddLaporan);
         laporanPanel.add(bottomPanel, BorderLayout.SOUTH);
 
+        // Panel Pembayaran
+        pembayaranPanel = new JPanel(new BorderLayout());
+        pembayaranModel = new DefaultTableModel(new String[]{"ID", "Jumlah", "Metode", "Tanggal", "Bukti","Tanggal"}, 0);
+        JTable pembayaranTable = new JTable(pembayaranModel);
+        pembayaranPanel.add(new JScrollPane(pembayaranTable), BorderLayout.CENTER);
+
+        JPanel pembayaranBottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton btnBayar = new JButton("Lakukan Pembayaran");
+        JButton btnBack2 = new JButton("Kembali ke Menu Utama");
+
+        btnBayar.addActionListener(e -> showPaymentDialog());
+        btnBack2.addActionListener(e -> cardLayout.show(mainPanel, "awal"));
+
+        pembayaranBottom.add(btnBack2);
+        pembayaranBottom.add(btnBayar);
+        pembayaranPanel.add(pembayaranBottom, BorderLayout.SOUTH);
+
         mainPanel.add(choicePanel, "awal");
         mainPanel.add(laporanPanel, "laporan");
+        mainPanel.add(pembayaranPanel, "pembayaran");
 
         setLayout(new BorderLayout());
         add(mainPanel, BorderLayout.CENTER);
         cardLayout.show(mainPanel, "awal");
+    }
+
+    private void refreshPaymentTable() {
+        pembayaranModel.setRowCount(0);
+        try (Connection c = DBConnection.getConnection()) {
+            String sql = "SELECT * FROM riwayat_pembayaran WHERE id_warga = (SELECT id_warga FROM user_app WHERE id_user=?) ORDER BY tanggal_pembayaran DESC";
+            try (PreparedStatement ps = c.prepareStatement(sql)) {
+                ps.setInt(1, userId);
+                ResultSet rs = ps.executeQuery();
+                while (rs.next()) {
+                    pembayaranModel.addRow(new Object[]{
+                        rs.getInt("id_pembayaran"),
+                        rs.getDouble("jumlah_pembayaran"),
+                        rs.getString("metode_pembayaran"),
+                        rs.getDate("tanggal_pembayaran"),
+                        rs.getString("gambar_path"),
+                        rs.getString("created_at")
+                    });
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Gagal memuat data pembayaran.");
+        }
+    }
+
+    private void showPaymentDialog() {
+        JPanel p = new JPanel(new GridLayout(5, 2));
+        JTextField tfJumlah = new JTextField();
+        tfJumlah.setEditable(false); // agar warga tidak bisa ubah
+        double jumlahTetap = 50000.0;
+        tfJumlah.setText(String.valueOf(jumlahTetap));
+
+        String[] metodeList = {"e-wallet", "transfer bank"};
+        JComboBox<String> cbMetode = new JComboBox<>(metodeList);
+
+        JComboBox<String> cbJenis = new JComboBox<>();
+        JLabel lblTujuan = new JLabel("Nomor: -");
+
+        cbMetode.addActionListener(e -> {
+            cbJenis.removeAllItems();
+            if (cbMetode.getSelectedItem().equals("e-wallet")) {
+                cbJenis.addItem("GoPay");
+                cbJenis.addItem("OVO");
+                cbJenis.addItem("DANA");
+            } else {
+                cbJenis.addItem("BCA");
+                cbJenis.addItem("BNI");
+                cbJenis.addItem("BRI");
+            }
+        });
+
+        cbJenis.addActionListener(e -> {
+            String selected = (String) cbJenis.getSelectedItem();
+            if (selected == null) {
+                return;
+            }
+            switch (selected) {
+                case "GoPay":
+                    lblTujuan.setText("Nomor: 0812-3456-7890");
+                    break;
+                case "OVO":
+                    lblTujuan.setText("Nomor: 0856-1122-3344");
+                    break;
+                case "DANA":
+                    lblTujuan.setText("Nomor: 0888-2233-4455");
+                    break;
+                case "BCA":
+                    lblTujuan.setText("Rekening: 1234567890");
+                    break;
+                case "BNI":
+                    lblTujuan.setText("Rekening: 0987654321");
+                    break;
+                case "BRI":
+                    lblTujuan.setText("Rekening: 5678901234");
+                    break;
+            }
+
+        });
+
+        JButton btnBrowse = new JButton("Pilih Bukti Pembayaran");
+        JLabel lblPath = new JLabel("Belum dipilih");
+        final String[] selectedFilePath = new String[1];
+
+        btnBrowse.addActionListener(e -> {
+            JFileChooser fc = new JFileChooser();
+            fc.setFileFilter(new FileNameExtensionFilter("Gambar", "jpg", "png", "jpeg"));
+            if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fc.getSelectedFile();
+                selectedFilePath[0] = selectedFile.getAbsolutePath();
+                lblPath.setText(selectedFile.getName());
+            }
+        });
+
+        p.add(new JLabel("Jumlah Pembayaran:"));
+        p.add(tfJumlah);
+        p.add(new JLabel("Metode Pembayaran:"));
+        p.add(cbMetode);
+        p.add(new JLabel("Jenis:"));
+        p.add(cbJenis);
+        p.add(new JLabel("Tujuan Transfer:"));
+        p.add(lblTujuan);
+        p.add(btnBrowse);
+        p.add(lblPath);
+
+        cbMetode.setSelectedIndex(0); // trigger jenis & tujuan default
+
+        int ok = JOptionPane.showConfirmDialog(this, p, "Lakukan Pembayaran", JOptionPane.OK_CANCEL_OPTION);
+        if (ok == JOptionPane.OK_OPTION) {
+            if (selectedFilePath[0] == null || cbJenis.getSelectedItem() == null) {
+                JOptionPane.showMessageDialog(this, "Lengkapi semua data dan unggah bukti.");
+                return;
+            }
+
+            try {
+                // 1. Buat folder images jika belum ada
+                String imagesDir = "images";
+                File folder = new File(imagesDir);
+                if (!folder.exists()) {
+                    folder.mkdirs();
+                }
+
+                // 2. Salin file bukti pembayaran
+                File sourceFile = new File(selectedFilePath[0]);
+                String newFileName = System.currentTimeMillis() + "_" + sourceFile.getName();
+                File destFile = new File(folder, newFileName);
+
+                java.nio.file.Files.copy(
+                        sourceFile.toPath(),
+                        destFile.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                );
+
+                String pathRelatif = imagesDir + "/" + newFileName;
+
+                // 3. Gabungkan metode + jenis (misal: "E-Wallet - GoPay")
+                String metode = cbMetode.getSelectedItem().toString() + " - " + cbJenis.getSelectedItem().toString();
+
+                try (Connection c = DBConnection.getConnection()) {
+
+                    // 4. Simpan data pembayaran
+                    String sql = "INSERT INTO riwayat_pembayaran (id_warga, jumlah_pembayaran, metode_pembayaran, tanggal_pembayaran, gambar_path) "
+                            + "VALUES ((SELECT id_warga FROM user_app WHERE id_user=?), ?, ?, CURRENT_DATE, ?)";
+                    try (PreparedStatement ps = c.prepareStatement(sql)) {
+                        ps.setInt(1, userId);
+                        ps.setDouble(2, jumlahTetap); // jumlah tetap dari variabel
+                        ps.setString(3, metode);
+                        ps.setString(4, pathRelatif);
+                        ps.executeUpdate();
+                    }
+
+                    // 5. Update status pembayaran di tabel warga
+                    String updateSql = "UPDATE warga SET status_pembayaran = 'Sudah' WHERE id_warga = (SELECT id_warga FROM user_app WHERE id_user = ?)";
+                    try (PreparedStatement updatePs = c.prepareStatement(updateSql)) {
+                        updatePs.setInt(1, userId);
+                        updatePs.executeUpdate();
+                    }
+
+                    // 6. Refresh tabel dan tampilkan notifikasi
+                    refreshPaymentTable();
+                    JOptionPane.showMessageDialog(this, "Pembayaran berhasil disimpan dan status diperbarui.");
+
+                }
+
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Gagal menyimpan pembayaran.");
+            }
+
+        }
     }
 
     private void refreshTable() {
@@ -125,16 +323,31 @@ public class WargaPanel1 extends JPanel {
     }
 
     private boolean isProfileComplete() {
-        String sql = "SELECT w.nama, w.alamat, w.no_hp, w.no_rumah, w.catatan_rumah FROM warga w JOIN user_app u ON w.id_warga = u.id_warga WHERE u.id_user=?";
+        String sql = "SELECT w.nama, w.alamat, w.no_hp, w.no_rumah, w.catatan_rumah, w.status_pembayaran "
+                + "FROM warga w JOIN user_app u ON w.id_warga = u.id_warga WHERE u.id_user=?";
         try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, userId);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
-                return rs.getString("nama") != null && !rs.getString("nama").trim().isEmpty()
+                boolean isProfileFilled = rs.getString("nama") != null && !rs.getString("nama").trim().isEmpty()
                         && rs.getString("alamat") != null && !rs.getString("alamat").trim().isEmpty()
                         && rs.getString("no_hp") != null && !rs.getString("no_hp").trim().isEmpty()
                         && rs.getString("no_rumah") != null && !rs.getString("no_rumah").trim().isEmpty()
                         && rs.getString("catatan_rumah") != null && !rs.getString("catatan_rumah").trim().isEmpty();
+
+                boolean isPaid = "Sudah".equalsIgnoreCase(rs.getString("status_pembayaran"));
+
+                if (!isProfileFilled) {
+                    JOptionPane.showMessageDialog(this, "Lengkapi profil terlebih dahulu.");
+                    return false;
+                }
+
+                if (!isPaid) {
+                    JOptionPane.showMessageDialog(this, "Silakan lakukan pembayaran terlebih dahulu.");
+                    return false;
+                }
+
+                return true;
             }
         } catch (SQLException ex) {
             ex.printStackTrace();

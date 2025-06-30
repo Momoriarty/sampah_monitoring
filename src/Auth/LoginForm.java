@@ -5,7 +5,6 @@ import View.MainForm;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.*;
@@ -17,12 +16,11 @@ public class LoginForm extends JFrame {
 
     public LoginForm() {
         setTitle("Login Aplikasi Sampah");
-        setSize(400, 250);
+        setSize(400, 300);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setResizable(false);
-        setLocationRelativeTo(null); 
+        setLocationRelativeTo(null);
 
-        // Panel Utama
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         GridBagConstraints gbc = new GridBagConstraints();
@@ -54,6 +52,7 @@ public class LoginForm extends JFrame {
         pfPass = new JPasswordField(15);
         panel.add(pfPass, gbc);
 
+        // Tombol Login
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.gridwidth = 2;
@@ -64,7 +63,19 @@ public class LoginForm extends JFrame {
         btnLogin.setFocusPainted(false);
         panel.add(btnLogin, gbc);
 
+        // Tombol Kembali
+        gbc.gridy++;
+        JButton btnBack = new JButton("Kembali");
+        btnBack.setBackground(Color.GRAY);
+        btnBack.setForeground(Color.WHITE);
+        btnBack.setFocusPainted(false);
+        panel.add(btnBack, gbc);
+
         btnLogin.addActionListener(e -> doLogin());
+        btnBack.addActionListener(e -> {
+            dispose();
+            new MainAuth();
+        });
 
         add(panel);
         setVisible(true);
@@ -81,9 +92,8 @@ public class LoginForm extends JFrame {
         try {
             String hashed = hashPassword(p);
 
-            try (Connection c = DBConnection.getConnection();
-                 PreparedStatement ps = c.prepareStatement(
-                         "SELECT id_user, role FROM user_app WHERE username=? AND password=?")) {
+            try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(
+                    "SELECT id_user, role FROM user_app WHERE username=? AND password=?")) {
                 ps.setString(1, u);
                 ps.setString(2, hashed);
                 ResultSet rs = ps.executeQuery();

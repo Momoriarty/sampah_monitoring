@@ -7,12 +7,12 @@ import java.awt.*;
 import java.awt.event.*;
 import java.sql.*;
 
-public class AdminPanel1 extends JPanel {
+public class AdminPanel extends JPanel {
 
     private DefaultTableModel modelRW, modelRT, modelWarga, modelJadwal;
     private JComboBox<String> cbRW, cbRT;
 
-    public AdminPanel1() {
+    public AdminPanel() {
         setLayout(new BorderLayout());
         JTabbedPane tabs = new JTabbedPane();
 
