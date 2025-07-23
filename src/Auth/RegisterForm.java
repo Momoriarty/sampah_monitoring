@@ -10,6 +10,7 @@ import java.sql.*;
 public class RegisterForm extends JFrame {
 
     private JTextField txtUsername = new JTextField();
+    private JTextField txtNama = new JTextField();
     private JPasswordField txtPassword = new JPasswordField();
     private JComboBox<String> cmbRole = new JComboBox<>(new String[]{"admin", "petugas", "warga"});
     private JButton btnRegister = new JButton("Register");
@@ -25,8 +26,8 @@ public class RegisterForm extends JFrame {
         c.insets = new Insets(5, 5, 5, 5);
         c.fill = GridBagConstraints.HORIZONTAL;
 
-        String[] labels = {"Username:", "Password:", "Role:"};
-        Component[] comps = {txtUsername, txtPassword, cmbRole};
+        String[] labels = {"Nama:", "Username:", "Password:", "Role:"};
+        Component[] comps = {txtNama, txtUsername, txtPassword, cmbRole};
 
         for (int i = 0; i < labels.length; i++) {
             c.gridx = 0;
@@ -62,6 +63,7 @@ public class RegisterForm extends JFrame {
     }
 
     private void registerUser() {
+        String nama = txtNama.getText().trim();
         String username = txtUsername.getText().trim();
         String password = new String(txtPassword.getPassword()).trim();
         String role = (String) cmbRole.getSelectedItem();
@@ -78,47 +80,48 @@ public class RegisterForm extends JFrame {
             }
 
             con.setAutoCommit(false);
-            Integer idWarga = null;
+            Integer idUser = null;
 
-            if ("warga".equals(role)) {
-                String insertWarga = "INSERT INTO warga (nama) VALUES (?)";
-                try (PreparedStatement pst = con.prepareStatement(insertWarga, Statement.RETURN_GENERATED_KEYS)) {
-                    pst.setString(1, username);
-                    pst.executeUpdate();
+            // 1. Insert ke users
+            String insertUser = "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
+            try (PreparedStatement pst = con.prepareStatement(insertUser, Statement.RETURN_GENERATED_KEYS)) {
+                pst.setString(1, username);
+                pst.setString(2, hashPassword(password));
+                pst.setString(3, role);
+                pst.executeUpdate();
 
-                    try (ResultSet rs = pst.getGeneratedKeys()) {
-                        if (rs.next()) {
-                            idWarga = rs.getInt(1);
-                        } else {
-                            con.rollback();
-                            showError("Gagal menyimpan data warga.");
-                            return;
-                        }
+                try (ResultSet rs = pst.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        idUser = rs.getInt(1);
+                    } else {
+                        con.rollback();
+                        showError("Gagal menyimpan user.");
+                        return;
                     }
                 }
             }
 
-            String insertUser = "INSERT INTO user_app (username, password, role, id_warga) VALUES (?, ?, ?, ?)";
-            try (PreparedStatement pst = con.prepareStatement(insertUser)) {
-                pst.setString(1, username);
-                pst.setString(2, hashPassword(password));
-                pst.setString(3, role);
-                if (idWarga != null) {
-                    pst.setInt(4, idWarga);
-                } else {
-                    pst.setNull(4, Types.INTEGER);
-                }
+            // 2. Insert ke tabel sesuai role
+            String insertSQL = null;
+            if ("warga".equals(role)) {
+                insertSQL = "INSERT INTO warga (nama, id_user) VALUES (?, ?)";
+            } else if ("petugas".equals(role)) {
+                insertSQL = "INSERT INTO petugas (nama, id_user) VALUES (?, ?)";
+            } else if ("admin".equals(role)) {
+                insertSQL = "INSERT INTO admin (nama, id_user) VALUES (?, ?)";
+            }
 
-                int rows = pst.executeUpdate();
-                if (rows > 0) {
-                    con.commit();
-                    JOptionPane.showMessageDialog(this, "Registrasi berhasil!");
-                    clearForm();
-                } else {
-                    con.rollback();
-                    showError("Registrasi gagal.");
+            if (insertSQL != null) {
+                try (PreparedStatement pst = con.prepareStatement(insertSQL)) {
+                    pst.setString(1, nama);
+                    pst.setInt(2, idUser);
+                    pst.executeUpdate();
                 }
             }
+
+            con.commit();
+            JOptionPane.showMessageDialog(this, "Registrasi berhasil!");
+            clearForm();
 
         } catch (SQLException ex) {
             ex.printStackTrace();
@@ -127,7 +130,7 @@ public class RegisterForm extends JFrame {
     }
 
     private boolean isUsernameExist(Connection con, String username) throws SQLException {
-        String sql = "SELECT COUNT(*) FROM user_app WHERE username = ?";
+        String sql = "SELECT COUNT(*) FROM users WHERE username = ?";
         try (PreparedStatement pst = con.prepareStatement(sql)) {
             pst.setString(1, username);
             try (ResultSet rs = pst.executeQuery()) {
@@ -155,6 +158,7 @@ public class RegisterForm extends JFrame {
     }
 
     private void clearForm() {
+        txtNama.setText("");
         txtUsername.setText("");
         txtPassword.setText("");
         cmbRole.setSelectedIndex(0);

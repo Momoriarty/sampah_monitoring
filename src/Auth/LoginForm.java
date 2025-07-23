@@ -93,15 +93,16 @@ public class LoginForm extends JFrame {
             String hashed = hashPassword(p);
 
             try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(
-                    "SELECT id_user, role FROM user_app WHERE username=? AND password=?")) {
+                    "SELECT * FROM users WHERE username=? AND password=?")) {
                 ps.setString(1, u);
                 ps.setString(2, hashed);
                 ResultSet rs = ps.executeQuery();
                 if (rs.next()) {
                     int id = rs.getInt("id_user");
                     String role = rs.getString("role");
+                    String username = rs.getString("username");
                     JOptionPane.showMessageDialog(this, "Login sukses: " + role);
-                    new MainForm(role, id);
+                    new MainForm(role, id, username);
                     dispose();
                 } else {
                     JOptionPane.showMessageDialog(this, "Username atau password salah.", "Login Gagal", JOptionPane.ERROR_MESSAGE);

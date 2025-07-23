@@ -5,20 +5,21 @@ import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.*;
 import java.io.File;
 import java.sql.*;
-import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 
-public class WargaPanel extends JPanel {
+public class WargaPanel1 extends JPanel {
 
     private int userId;
     private DefaultTableModel model;
     private DefaultTableModel pembayaranModel;
+    private DefaultTableModel keluhanModel;
     private CardLayout cardLayout;
-    private JPanel mainPanel, choicePanel, laporanPanel, pembayaranPanel;
+    private JPanel mainPanel, choicePanel, laporanPanel, pembayaranPanel, keluhanPanel;
 
-    public WargaPanel(int userId) {
+    public WargaPanel1(int userId) {
         this.userId = userId;
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
@@ -31,6 +32,7 @@ public class WargaPanel extends JPanel {
         JButton btnProfil = new JButton("Perbarui Profil");
         JButton btnLaporan = new JButton("Tambah Laporan");
         JButton btnPembayaran = new JButton("Riwayat Pembayaran");
+        JButton btnKeluhan = new JButton("Tambah Keluhan");
 
         btnProfil.addActionListener(e -> showUpdateProfileDialog());
         btnLaporan.addActionListener(e -> {
@@ -45,6 +47,11 @@ public class WargaPanel extends JPanel {
             refreshPaymentTable();
         });
 
+        btnKeluhan.addActionListener(e -> {
+            cardLayout.show(mainPanel, "keluhan");
+            refreshKeluhanTable();
+        });
+
         gbc.gridx = 0;
         gbc.gridy = 0;
         choicePanel.add(new JLabel("Silakan pilih aksi:"), gbc);
@@ -54,6 +61,8 @@ public class WargaPanel extends JPanel {
         choicePanel.add(btnLaporan, gbc);
         gbc.gridy++;
         choicePanel.add(btnPembayaran, gbc);
+        gbc.gridy++;
+        choicePanel.add(btnKeluhan, gbc);
 
         // Panel Laporan
         laporanPanel = new JPanel(new BorderLayout());
@@ -74,7 +83,7 @@ public class WargaPanel extends JPanel {
 
         // Panel Pembayaran
         pembayaranPanel = new JPanel(new BorderLayout());
-        pembayaranModel = new DefaultTableModel(new String[]{"ID", "Jumlah", "Metode", "Tanggal", "Bukti","Tanggal"}, 0);
+        pembayaranModel = new DefaultTableModel(new String[]{"ID", "Jumlah", "Metode", "Tanggal", "Bukti", "Tanggal"}, 0);
         JTable pembayaranTable = new JTable(pembayaranModel);
         pembayaranPanel.add(new JScrollPane(pembayaranTable), BorderLayout.CENTER);
 
@@ -89,19 +98,136 @@ public class WargaPanel extends JPanel {
         pembayaranBottom.add(btnBayar);
         pembayaranPanel.add(pembayaranBottom, BorderLayout.SOUTH);
 
+        // Panel Keluhan
+        keluhanPanel = new JPanel(new BorderLayout());
+        keluhanModel = new DefaultTableModel(new String[]{"No", "Tanggal", "Keluhan", "Status", "Tanggapan", "Tanggal Ditanggapi"}, 0);
+        JTable keluhanTable = new JTable(keluhanModel);
+        keluhanPanel.add(new JScrollPane(keluhanTable), BorderLayout.CENTER);
+
+        JPanel keluhanBottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton btnAddKeluhan = new JButton("Tambah Keluhan Baru");
+        JButton btnBackKeluhan = new JButton("Kembali ke Menu Utama");
+
+        btnAddKeluhan.addActionListener(e -> showAddKeluhanDialog());
+        btnBackKeluhan.addActionListener(e -> cardLayout.show(mainPanel, "awal"));
+
+        keluhanBottom.add(btnBackKeluhan);
+        keluhanBottom.add(btnAddKeluhan);
+        keluhanPanel.add(keluhanBottom, BorderLayout.SOUTH);
+
+        // Menambahkan semua panel ke mainPanel
         mainPanel.add(choicePanel, "awal");
         mainPanel.add(laporanPanel, "laporan");
         mainPanel.add(pembayaranPanel, "pembayaran");
+        mainPanel.add(keluhanPanel, "keluhan");
 
         setLayout(new BorderLayout());
         add(mainPanel, BorderLayout.CENTER);
         cardLayout.show(mainPanel, "awal");
     }
 
+    public void refreshData() {
+        Component currentComponent = null;
+
+        for (Component comp : mainPanel.getComponents()) {
+            if (comp.isVisible()) {
+                currentComponent = comp;
+                break;
+            }
+        }
+
+        if (currentComponent == laporanPanel) {
+            refreshTable();
+        } else if (currentComponent == pembayaranPanel) {
+            refreshPaymentTable();
+        } else if (currentComponent == keluhanPanel) {
+            refreshKeluhanTable();
+        }
+    }
+
+    private void showAddKeluhanDialog() {
+        JTextArea textKeluhan = new JTextArea(5, 30);
+        JScrollPane scrollPane = new JScrollPane(textKeluhan);
+
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.add(new JLabel("Masukkan Keluhan Anda:"), BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        JButton uploadButton = new JButton("Unggah Gambar (Opsional)");
+        JLabel selectedImageLabel = new JLabel("Belum ada gambar dipilih");
+
+        final String[] imagePath = {null}; // untuk menyimpan path sementara
+
+        uploadButton.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            int option = fileChooser.showOpenDialog(panel);
+            if (option == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                imagePath[0] = selectedFile.getAbsolutePath();
+                selectedImageLabel.setText("Dipilih: " + selectedFile.getName());
+            }
+        });
+
+        JPanel imagePanel = new JPanel(new BorderLayout());
+        imagePanel.add(uploadButton, BorderLayout.NORTH);
+        imagePanel.add(selectedImageLabel, BorderLayout.SOUTH);
+
+        panel.add(imagePanel, BorderLayout.SOUTH);
+
+        int result = JOptionPane.showConfirmDialog(this, panel, "Keluhan Baru", JOptionPane.OK_CANCEL_OPTION);
+        if (result == JOptionPane.OK_OPTION) {
+            String keluhan = textKeluhan.getText().trim();
+            if (!keluhan.isEmpty()) {
+                try (Connection conn = DBConnection.getConnection()) {
+                    PreparedStatement stmt = conn.prepareStatement(
+                            "INSERT INTO keluhan (id_warga, isi_keluhan, gambar_path, status_keluhan, tanggal_ditanggapi) "
+                            + "VALUES ((SELECT id_warga FROM warga WHERE id_user = ?), ?, ?, 'Menunggu', NULL)"
+                    );
+                    stmt.setInt(1, userId);
+                    stmt.setString(2, keluhan);
+                    stmt.setString(3, imagePath[0]); // bisa null jika tidak memilih
+                    stmt.executeUpdate();
+                    refreshKeluhanTable();
+                    JOptionPane.showMessageDialog(this, "Keluhan berhasil dikirim.");
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    JOptionPane.showMessageDialog(this, "Gagal menyimpan keluhan.");
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "Keluhan tidak boleh kosong.");
+            }
+        }
+    }
+
+    private void refreshKeluhanTable() {
+        keluhanModel.setRowCount(0);
+        try (Connection conn = DBConnection.getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT * FROM keluhan WHERE id_warga = (SELECT id_warga FROM warga WHERE id_user = ?)"
+            );
+            stmt.setInt(1, userId);
+            ResultSet rs = stmt.executeQuery();
+            int no = 1;
+            while (rs.next()) {
+                keluhanModel.addRow(new Object[]{
+                    no++,
+                    rs.getDate("created_at"),
+                    rs.getString("isi_keluhan"),
+                    rs.getString("status_keluhan"),
+                    rs.getString("tanggapan"),
+                    rs.getDate("tanggal_ditanggapi")
+                }
+                );
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     private void refreshPaymentTable() {
         pembayaranModel.setRowCount(0);
         try (Connection c = DBConnection.getConnection()) {
-            String sql = "SELECT * FROM riwayat_pembayaran WHERE id_warga = (SELECT id_warga FROM user_app WHERE id_user=?) ORDER BY tanggal_pembayaran DESC";
+            String sql = "SELECT * FROM riwayat_pembayaran WHERE id_warga = (SELECT id_warga FROM warga WHERE id_user=?) ORDER BY tanggal_pembayaran DESC";
             try (PreparedStatement ps = c.prepareStatement(sql)) {
                 ps.setInt(1, userId);
                 ResultSet rs = ps.executeQuery();
@@ -238,17 +364,17 @@ public class WargaPanel extends JPanel {
 
                     // 4. Simpan data pembayaran
                     String sql = "INSERT INTO riwayat_pembayaran (id_warga, jumlah_pembayaran, metode_pembayaran, tanggal_pembayaran, gambar_path) "
-                            + "VALUES ((SELECT id_warga FROM user_app WHERE id_user=?), ?, ?, CURRENT_DATE, ?)";
+                            + "VALUES ((SELECT id_warga FROM warga WHERE id_user=?), ?, ?, CURRENT_DATE, ?)";
                     try (PreparedStatement ps = c.prepareStatement(sql)) {
                         ps.setInt(1, userId);
-                        ps.setDouble(2, jumlahTetap); // jumlah tetap dari variabel
+                        ps.setDouble(2, jumlahTetap);
                         ps.setString(3, metode);
                         ps.setString(4, pathRelatif);
                         ps.executeUpdate();
                     }
 
                     // 5. Update status pembayaran di tabel warga
-                    String updateSql = "UPDATE warga SET status_pembayaran = 'Sudah' WHERE id_warga = (SELECT id_warga FROM user_app WHERE id_user = ?)";
+                    String updateSql = "UPDATE warga SET status_pembayaran = 'Sudah' WHERE id_warga = (SELECT id_warga FROM users WHERE id_user = ?)";
                     try (PreparedStatement updatePs = c.prepareStatement(updateSql)) {
                         updatePs.setInt(1, userId);
                         updatePs.executeUpdate();
@@ -273,16 +399,21 @@ public class WargaPanel extends JPanel {
         try (Connection c = DBConnection.getConnection()) {
             String sql = "SELECT l.*, w.id_rt, w.id_rw "
                     + "FROM laporan_sampah l "
-                    + "JOIN user_app u ON l.id_warga=u.id_warga "
-                    + "JOIN warga w ON w.id_warga = u.id_warga "
-                    + "WHERE u.id_user=?";
+                    + "JOIN warga w ON w.id_warga = l.id_warga "
+                    + "WHERE w.id_user=?";
             try (PreparedStatement ps = c.prepareStatement(sql)) {
                 ps.setInt(1, userId);
                 ResultSet rs = ps.executeQuery();
                 int no = 1;
+
                 while (rs.next()) {
-                    int idLaporan = no++;
-                    Date tanggal = rs.getDate("tanggal_lapor");
+                    int idLaporan = rs.getInt("id_laporan");
+                    Date tanggalLapor = rs.getDate("tanggal_lapor"); // java.sql.Date langsung dari JDBC
+                    java.sql.Date tanggal = null;
+                    if (tanggalLapor != null) {
+                        tanggal = new java.sql.Date(tanggalLapor.getTime()); // konversi ulang, aman
+                    }
+
                     float organik = rs.getFloat("berat_organik");
                     float anorganik = rs.getFloat("berat_anorganik");
                     String catatan = rs.getString("catatan");
@@ -292,7 +423,11 @@ public class WargaPanel extends JPanel {
 
                     String jadwalSql = "SELECT * FROM jadwal_pengangkutan WHERE tanggal=? AND id_rt=? AND id_rw=?";
                     try (PreparedStatement psJadwal = c.prepareStatement(jadwalSql)) {
-                        psJadwal.setDate(1, tanggal);
+                        if (tanggal != null) {
+                            psJadwal.setDate(1, tanggal);
+                        } else {
+                            psJadwal.setNull(1, java.sql.Types.DATE);
+                        }
                         psJadwal.setInt(2, idRt);
                         psJadwal.setInt(3, idRw);
                         ResultSet rsJadwal = psJadwal.executeQuery();
@@ -308,7 +443,7 @@ public class WargaPanel extends JPanel {
                         }
                     }
 
-                    model.addRow(new Object[]{idLaporan, tanggal, organik, anorganik, catatan, status});
+                    model.addRow(new Object[]{no++, tanggal, organik, anorganik, catatan, status});
                 }
             }
 
@@ -324,7 +459,7 @@ public class WargaPanel extends JPanel {
 
     private boolean isProfileComplete() {
         String sql = "SELECT w.nama, w.alamat, w.no_hp, w.no_rumah, w.catatan_rumah, w.status_pembayaran "
-                + "FROM warga w JOIN user_app u ON w.id_warga = u.id_warga WHERE u.id_user=?";
+                + "FROM warga w JOIN users u ON w.id_user = u.id_user WHERE w.id_user=?";
         try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, userId);
             ResultSet rs = ps.executeQuery();
@@ -378,36 +513,100 @@ public class WargaPanel extends JPanel {
 
                 float o = Float.parseFloat(tfOrg.getText());
                 float a = Float.parseFloat(tfAnOrg.getText());
-                String cat = tfCat.getText();
+                String catatan = tfCat.getText();
 
                 if (o < 0 || a < 0) {
                     JOptionPane.showMessageDialog(this, "Berat tidak boleh negatif.");
                     return;
                 }
 
-                String ins = "INSERT INTO laporan_sampah (id_warga, tanggal_lapor, berat_organik, berat_anorganik, catatan, status) "
-                        + "VALUES ((SELECT id_warga FROM user_app WHERE id_user=?), CURDATE(), ?, ?, ?, 'Menunggu')";
-                try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(ins)) {
-                    ps.setInt(1, userId);
-                    ps.setFloat(2, o);
-                    ps.setFloat(3, a);
-                    ps.setString(4, cat);
-                    ps.executeUpdate();
+                try (Connection conn = DBConnection.getConnection()) {
+                    // Ambil data warga berdasarkan user login
+                    PreparedStatement getWarga = conn.prepareStatement(
+                            "SELECT w.id_warga, w.id_rt, w.id_rw FROM users u JOIN warga w ON w.id_user = u.id_user WHERE u.id_user = ?"
+                    );
+                    getWarga.setInt(1, userId);
+                    ResultSet rsWarga = getWarga.executeQuery();
+                    if (!rsWarga.next()) {
+                        JOptionPane.showMessageDialog(this, "Data warga tidak ditemukan.");
+                        return;
+                    }
+                    int idWarga = rsWarga.getInt("id_warga");
+                    int idRT = rsWarga.getInt("id_rt");
+                    int idRW = rsWarga.getInt("id_rw");
+
+                    // Hari ini & batas 2 hari ke depan
+                    Date tanggalLapor = new Date();
+                    Calendar cal = Calendar.getInstance();
+                    cal.setTime(tanggalLapor);
+
+                    Calendar batas = Calendar.getInstance();
+                    batas.setTime(tanggalLapor);
+                    batas.add(Calendar.DAY_OF_MONTH, 2);
+
+                    // Cek jadwal pengangkutan dalam 2 hari
+                    PreparedStatement ps = conn.prepareStatement(
+                            "SELECT id_jadwal FROM jadwal_pengangkutan WHERE id_rt = ? AND id_rw = ? AND tanggal BETWEEN ? AND ? LIMIT 1"
+                    );
+                    ps.setInt(1, idRT);
+                    ps.setInt(2, idRW);
+                    ps.setDate(3, new java.sql.Date(tanggalLapor.getTime()));
+                    ps.setDate(4, new java.sql.Date(batas.getTimeInMillis()));
+                    ResultSet rsJadwal = ps.executeQuery();
+
+                    int idJadwal;
+                    if (rsJadwal.next()) {
+                        idJadwal = rsJadwal.getInt("id_jadwal");
+                    } else {
+                        // Buat jadwal baru untuk 2 hari ke depan
+                        cal.add(Calendar.DAY_OF_MONTH, 2);
+                        java.sql.Date tanggalBaru = new java.sql.Date(cal.getTimeInMillis());
+                        java.sql.Time jam = java.sql.Time.valueOf("08:00:00");
+
+                        PreparedStatement insertJadwal = conn.prepareStatement(
+                                "INSERT INTO jadwal_pengangkutan (tanggal, jam, id_rt, id_rw) VALUES (?, ?, ?, ?)",
+                                Statement.RETURN_GENERATED_KEYS
+                        );
+                        insertJadwal.setDate(1, tanggalBaru);
+                        insertJadwal.setTime(2, jam);
+                        insertJadwal.setInt(3, idRT);
+                        insertJadwal.setInt(4, idRW);
+                        insertJadwal.executeUpdate();
+
+                        ResultSet genKeys = insertJadwal.getGeneratedKeys();
+                        genKeys.next();
+                        idJadwal = genKeys.getInt(1);
+                    }
+
+                    // Masukkan ke laporan_sampah
+                    PreparedStatement insertLaporan = conn.prepareStatement(
+                            "INSERT INTO laporan_sampah (id_warga, tanggal_lapor, berat_organik, berat_anorganik, catatan, status) "
+                            + "VALUES ((SELECT id_warga FROM warga WHERE id_user = ?), ?, ?, ?, ?, 'Menunggu')"
+                    );
+                    insertLaporan.setInt(1, userId);
+                    insertLaporan.setDate(2, new java.sql.Date(tanggalLapor.getTime()));
+                    insertLaporan.setFloat(3, o);
+                    insertLaporan.setFloat(4, a);
+                    insertLaporan.setString(5, catatan);
+                    insertLaporan.executeUpdate();
+
                     refreshTable();
-                    JOptionPane.showMessageDialog(this, "Laporan berhasil ditambahkan.");
+                    JOptionPane.showMessageDialog(this, "Laporan berhasil dikirim dan dijadwalkan!");
+
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    JOptionPane.showMessageDialog(this, "Gagal menambahkan laporan.");
                 }
+
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(this, "Berat harus berupa angka.");
-            } catch (SQLException ex) {
-                ex.printStackTrace();
-                JOptionPane.showMessageDialog(this, "Gagal menambahkan laporan.");
             }
         }
     }
 
     private void showUpdateProfileDialog() {
         String getSql = "SELECT w.id_warga, w.nama, w.alamat, w.no_rumah, w.no_hp, w.id_rw, w.id_rt, w.catatan_rumah "
-                + "FROM warga w JOIN user_app u ON w.id_warga = u.id_warga WHERE u.id_user=?";
+                + "FROM warga w JOIN users u ON w.id_user = u.id_user WHERE w.id_user=?";
         try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(getSql)) {
             ps.setInt(1, userId);
             ResultSet rs = ps.executeQuery();
@@ -429,7 +628,7 @@ public class WargaPanel extends JPanel {
                 ResultSet rsRW = psRW.executeQuery();
                 while (rsRW.next()) {
                     int id = rsRW.getInt("id_rw");
-                    String label = "RW " + id + " - " + rsRW.getString("nama_rw");
+                    String label = rsRW.getString("nama_rw");
                     cbRW.addItem(label);
                     if (id == selectedRW) {
                         cbRW.setSelectedItem(label);
@@ -449,7 +648,7 @@ public class WargaPanel extends JPanel {
                         ResultSet rsRT = psRT.executeQuery();
                         while (rsRT.next()) {
                             int id = rsRT.getInt("id_rt");
-                            String label = "RT " + rsRT.getInt("nomor_rt") + " - " + rsRT.getString("nama_rt");
+                            String label = rsRT.getString("nama_rt");
                             cbRT.addItem(label);
                             if (id == selectedRT) {
                                 cbRT.setSelectedItem(label);
